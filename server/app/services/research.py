@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Announcement, Company, FinancialResult, ManagementGuidance, ResearchDocument
+from app.services.research_analytics import financial_analytics, market_analytics
 
 logger = logging.getLogger(__name__)
 METRIC_FIELDS = {
@@ -15,6 +16,15 @@ METRIC_FIELDS = {
     "ebitda": ("EBITDA", "Normalized EBITDA"),
     "pbt": ("Pretax Income", "Pre Tax Income", "Profit Before Tax"),
     "pat": ("Net Income", "Net Income Common Stockholders", "Profit After Tax"),
+}
+EXTRA_METRIC_FIELDS = {
+    "total_debt": ("Total Debt", "Long Term Debt", "Short Long Term Debt"),
+    "total_equity": ("Stockholders Equity", "Total Equity Gross Minority Interest", "Total Stockholder Equity"),
+    "cash_and_equivalents": ("Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"),
+    "operating_cash_flow": ("Operating Cash Flow", "Total Cash From Operating Activities"),
+    "free_cash_flow": ("Free Cash Flow",),
+    "current_assets": ("Current Assets",),
+    "current_liabilities": ("Current Liabilities",),
 }
 
 
@@ -81,6 +91,29 @@ def sync_research(db: Session, ticker: str, exchange: str = "NSE") -> dict:
                     else:
                         db.add(FinancialResult(company_id=company.id, period_end=period_end, period_label=f"Q{((period_end.month - 1) // 3) + 1} {period_end.year}", basis="consolidated", metric=metric, value=value, unit="provider units", source_url=source_url, source_name="yfinance"))
                     period_count += 1
+        balance_sheet = stock.quarterly_balance_sheet
+        cash_flow = stock.quarterly_cashflow
+        provider_frames = [
+            (balance_sheet, ("total_debt", "total_equity", "cash_and_equivalents", "current_assets", "current_liabilities")),
+            (cash_flow, ("operating_cash_flow", "free_cash_flow")),
+        ]
+        for frame, allowed_metrics in provider_frames:
+            if frame is None or frame.empty:
+                continue
+            for period in list(frame.columns)[:8]:
+                period_end = pd.Timestamp(period).date()
+                for metric, candidates in EXTRA_METRIC_FIELDS.items():
+                    if metric not in allowed_metrics:
+                        continue
+                    value = next((float(frame.loc[candidate, period]) for candidate in candidates if candidate in frame.index and pd.notna(frame.loc[candidate, period])), None)
+                    if value is None:
+                        continue
+                    existing = db.scalar(select(FinancialResult).where(FinancialResult.company_id == company.id, FinancialResult.period_end == period_end, FinancialResult.basis == "consolidated", FinancialResult.metric == metric))
+                    if existing:
+                        existing.value = value
+                        existing.fetched_at = datetime.now(UTC)
+                    else:
+                        db.add(FinancialResult(company_id=company.id, period_end=period_end, period_label=f"Q{((period_end.month - 1) // 3) + 1} {period_end.year}", basis="consolidated", metric=metric, value=value, unit="provider units", source_url=source_url, source_name="yfinance"))
         db.commit()
         sync_announcements_to_documents(db, company)
     except Exception as exc:
@@ -132,6 +165,8 @@ def research_payload(db: Session, company: Company, provider_error: str | None =
             comparisons.append({"metric": metric, "period_label": current.period_label, "value": current.value, "unit": current.unit, "qoq_percent": qoq, "qoq_derived": qoq is not None, "yoy_percent": yoy, "yoy_derived": yoy is not None, "basis": current.basis, "source_url": current.source_url, "source_name": current.source_name})
     documents = db.scalars(select(ResearchDocument).where(ResearchDocument.company_id == company.id).order_by(ResearchDocument.published_at.desc())).all()
     guidance = db.scalars(select(ManagementGuidance).where(ManagementGuidance.company_id == company.id).order_by(ManagementGuidance.published_at.desc())).all()
+    analytics = financial_analytics(db, company.id)
+    analytics["ml_insights"].extend(market_analytics(db, company.id))
     return {
         "company": company,
         "provider_status": "unavailable" if provider_error else ("partial" if not results else "available"),
@@ -141,6 +176,7 @@ def research_payload(db: Session, company: Company, provider_error: str | None =
         "periods": periods,
         "documents": documents,
         "guidance": guidance,
+        **analytics,
     }
 
 

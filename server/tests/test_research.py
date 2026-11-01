@@ -1,4 +1,5 @@
 from app.services.research import percentage_change
+from app.services.research_analytics import robust_z
 
 
 def test_percentage_change_calculation():
@@ -11,3 +12,9 @@ def test_percentage_change_handles_missing_prior():
 
 def test_percentage_change_handles_zero_prior():
     assert percentage_change(110, 0) is None
+
+
+def test_robust_z_requires_history():
+    score = robust_z([10, 11, 10])
+    assert score is not None
+    assert abs(score) < 1

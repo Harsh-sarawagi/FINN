@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import logging
 from datetime import UTC, datetime, timedelta
 from html import unescape
@@ -40,14 +40,14 @@ def extractive_summary(title: str, content: str | None) -> str:
 def ai_summary(title: str, content: str | None) -> tuple[str, bool]:
     settings = get_settings()
     source = (content or title).strip()
-    if not settings.openai_api_key or not source:
+    if not settings.llm_api_key or not source:
         return extractive_summary(title, content), False
     try:
         response = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+            settings.llm_api_url,
+            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
             json={
-                "model": settings.openai_model or "gpt-4o-mini",
+                "model": settings.llm_model,
                 "messages": [
                     {"role": "system", "content": "Summarize only the supplied announcement. Do not add facts or speculate. Return two concise sentences maximum."},
                     {"role": "user", "content": f"Title: {title}\nAvailable content: {source[:5000]}"},
@@ -151,7 +151,7 @@ def sync_announcements(db: Session) -> AnnouncementIngestionStatus:
     db.commit()
     added = 0
     errors = []
-    companies = db.scalars(select(Company).join(PortfolioMember, PortfolioMember.company_id == Company.id)).unique().all()
+    companies = db.scalars(select(Company).join(PortfolioMember, PortfolioMember.company_id == Company.id).where(PortfolioMember.is_active.is_(True))).unique().all()
     headers = {"User-Agent": "Mozilla/5.0 FINN Market Intelligence", "Accept-Language": "en-US,en;q=0.9"}
     try:
         with httpx.Client(headers=headers, follow_redirects=True) as session:

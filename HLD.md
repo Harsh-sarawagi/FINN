@@ -258,6 +258,8 @@ FINN currently has:
 - Reusable frontend API clients driven by `NEXT_PUBLIC_API_BASE_URL`.
 - SQLAlchemy PostgreSQL connection management, migrations, seeds, and connectivity checks.
 - Portfolio, market, announcement, alert, research, document, guidance, and assistant data models.
+- Portfolio companies use persistent membership rows and an append-only lifecycle history. Removing a company sets membership inactive rather than deleting the company or its historical data; restoring the company reactivates the same membership and prevents duplicates. Catalog discovery and ticker search are separate from active portfolio membership.
+- Research stores provider-reported financial metrics and source provenance, calculates margins/growth/leverage deterministically, applies robust-z anomaly screens, and indexes extracted document text into chunks. OpenAI embeddings enable semantic retrieval; cosine scoring currently runs in the application against embeddings stored in PostgreSQL because `pgvector` was unavailable in the verified database. AI remains restricted to evidence-grounded interpretation and source citations.
 - Optional provider and AI integrations with explicit stored-data and source-grounded fallbacks.
 - Backend tests and frontend lint/build validation.
 

@@ -30,7 +30,7 @@ def sync_portfolio_market_data(db: Session) -> MarketSyncStatus:
     db.commit()
 
     companies = db.scalars(
-        select(Company).join(PortfolioMember, PortfolioMember.company_id == Company.id)
+        select(Company).join(PortfolioMember, PortfolioMember.company_id == Company.id).where(PortfolioMember.is_active.is_(True))
     ).unique().all()
     records = 0
 
@@ -97,7 +97,7 @@ def sync_portfolio_market_data(db: Session) -> MarketSyncStatus:
 
 
 def get_dashboard(db: Session) -> dict:
-    members = db.scalars(select(PortfolioMember).order_by(PortfolioMember.id)).unique().all()
+    members = db.scalars(select(PortfolioMember).where(PortfolioMember.is_active.is_(True)).order_by(PortfolioMember.id)).unique().all()
     instruments = []
     movers = []
 

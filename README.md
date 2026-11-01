@@ -7,7 +7,7 @@ FINN is a full-stack investment intelligence prototype built for the ENAM AI Eng
 - Portfolio: add and remove NSE/BSE companies from the catalog.
 - Market dashboard: refresh and view end-of-day prices, volume, daily changes, gainers, losers, and last-update status.
 - Push intelligence: ingest NSE/BSE announcements, categorize them, create alert rules, view a daily digest, and mark alerts read.
-- Pull research: search the company catalog, retrieve provider-reported financial periods, compare QoQ/YoY deterministically, and browse source-linked documents and guidance.
+- Pull research: search the company catalog, retrieve provider-reported financial periods, compare QoQ/YoY deterministically, calculate financial ratios, screen unusual patterns, and browse source-linked documents and guidance.
 - AI research assistant: retrieve evidence from stored FINN data, link supporting sources, and optionally use OpenAI for explanation.
 - Provider resilience: stored data remains available when external sources fail. Missing live data is labeled clearly rather than fabricated.
 
@@ -75,7 +75,11 @@ From server/, copy .env.example to .env and configure:
 | DATABASE_URL | Yes | PostgreSQL connection string, for example `postgresql+psycopg://user:password@localhost:5432/finn` |
 | CORS_ORIGINS | Yes | Comma-separated frontend origins |
 | OPENAI_API_KEY | No | Enables assistant and announcement-summary interpretation |
+| OPENAI_EMBEDDING_MODEL | No | Embedding model used for semantic document research; defaults to `text-embedding-3-small` |
 | OPENAI_MODEL | No | Optional OpenAI model; defaults to a supported application default |
+| AI_API_KEY | No | Groq or other OpenAI-compatible chat provider API key |
+| AI_API_URL | No | OpenAI-compatible chat-completions URL; defaults to Groq when key is configured |
+| AI_MODEL_NAME | No | Chat provider model, for example `openai/gpt-oss-120b` |
 | ENVIRONMENT | No | Application environment label |
 
 Never commit `.env`. Keep database credentials and API keys only in local or deployment secret stores.
@@ -127,6 +131,13 @@ FINN runs at http://localhost:3000.
 3. Refresh intelligence from the dashboard and review categorized announcements, alert rules, digest, and read-state alerts.
 4. Open `/research`, select a company, and review reported financial metrics, deterministic comparisons, documents, and guidance.
 5. Ask the research assistant a supported question, then inspect source links, periods, basis, and document references.
+
+The assistant ranks evidence within the selected company before sending it to the configured
+OpenAI-compatible provider. Financial records are ranked by metric intent, announcements and
+guidance use lexical relevance, and indexed document chunks combine keyword relevance with
+optional embedding similarity when an OpenAI embedding key is configured. Groq chat providers
+do not provide embeddings; FINN therefore remains fully searchable through keyword retrieval
+when only Groq chat credentials are available.
 6. Without an OpenAI key or provider access, repeat the workflow and confirm that FINN displays source-grounded fallback or unavailable states.
 
 ## Main API groups
@@ -135,6 +146,7 @@ FINN runs at http://localhost:3000.
 |---|---|
 | Health | `GET /health`, `GET /health/db` |
 | Portfolio | `GET/POST /api/v1/portfolio`, `DELETE /api/v1/portfolio/{ticker}` |
+| Portfolio catalog/history | `GET /api/v1/companies?q=...`, `POST /api/v1/companies/discover`, `GET /api/v1/portfolio/history` |
 | Market | `GET /api/v1/dashboard`, `POST /api/v1/market/sync`, `GET /api/v1/market/status` |
 | Intelligence | `POST /api/v1/announcements/ingest`, `GET /api/v1/announcements`, `GET /api/v1/digest/daily`, `GET/POST /api/v1/alert-rules`, `GET /api/v1/alerts` |
 | Research | `GET /api/v1/research/companies`, `POST /api/v1/research/sync`, `GET /api/v1/research/companies/{ticker}` |
@@ -177,10 +189,11 @@ For a small prototype deployment, run the Next.js frontend and FastAPI backend a
 
 - Market values are yfinance end-of-day values and may be unavailable or stale.
 - NSE/BSE ingestion and document availability depend on external HTML/PDF endpoints.
-- The research assistant uses deterministic keyword retrieval, not embeddings or a vector database.
+- Research document embeddings and semantic cosine retrieval are available when OpenAI embeddings are configured. Embeddings are stored in PostgreSQL document-chunk rows; application-level cosine search is used because the verified PostgreSQL instance does not provide the `pgvector` extension.
 - QoQ/YoY comparisons are calculated in Python; AI is not allowed to calculate them.
 - OpenAI answers are based on FINN's retrieved evidence only. Missing sources, provider failures, and missing API keys produce explicit fallback messages.
 - Financial provider units are preserved and are not automatically converted to INR.
 - There is no authentication or user isolation in this prototype. Scheduled ingestion uses in-process workers with PostgreSQL overlap protection, and no external queue or production vector retrieval is configured.
+- Portfolio removal deactivates membership only; company data and historical records are preserved. Removed memberships can be restored without creating a duplicate company or membership.
 
 FINN must not be treated as investment advice.

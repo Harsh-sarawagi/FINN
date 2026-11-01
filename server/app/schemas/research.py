@@ -63,6 +63,10 @@ class ResearchResponse(BaseModel):
     periods: list[FinancialPeriod]
     documents: list[ResearchDocumentResponse]
     guidance: list[GuidanceResponse]
+    financial_health: dict
+    trend: list[dict]
+    ml_insights: list[dict] = []
+    model_scope: str = ""
 
 
 class CompanySearchResponse(BaseModel):
