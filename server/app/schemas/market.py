@@ -2,6 +2,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
+class MarketPricePoint(BaseModel):
+    price_date: str
+    close: float
+
+
 class MarketInstrument(BaseModel):
     ticker: str
     name: str
@@ -10,6 +15,7 @@ class MarketInstrument(BaseModel):
     change_percent: float | None
     volume: int | None
     price_date: str | None
+    history: list[MarketPricePoint] = []
 
 
 class DashboardMover(BaseModel):

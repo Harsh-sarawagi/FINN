@@ -7,15 +7,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "FINN Investment Intelligence API"
     environment: str = "development"
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/finn"
+    cors_origins: str = ""
+    database_url: str = ""
     openai_api_key: str = ""
     openai_model: str = ""
     openai_embedding_model: str = "text-embedding-3-small"
     ai_api_key: str = ""
     ai_api_url: str = ""
     ai_model_name: str = ""
-    scheduler_enabled: bool = True
+    scheduler_enabled: bool = False
     market_ingestion_interval_minutes: int = 60
     announcement_ingestion_interval_minutes: int = 30
     scheduler_run_on_startup: bool = False
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [origin.strip().rstrip("/") for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def llm_api_key(self) -> str:
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     @property
     def llm_model(self) -> str:
         return self.ai_model_name or self.openai_model or "gpt-4o-mini"
+
 
 @lru_cache
 def get_settings() -> Settings:

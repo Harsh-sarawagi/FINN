@@ -105,13 +105,18 @@ def get_dashboard(db: Session) -> dict:
         company = db.get(Company, member.company_id)
         if not company:
             continue
-        rows = db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id).order_by(MarketPrice.price_date.desc()).limit(2)).all()
+        rows = db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id).order_by(MarketPrice.price_date.desc()).limit(20)).all()
         current = rows[0] if rows else None
         previous = rows[1] if len(rows) > 1 else None
         change = ((current.close / previous.close) - 1) * 100 if current and previous and previous.close else None
         price = current.close if current else None
         date_value = current.price_date.isoformat() if current else None
-        instruments.append({"ticker": company.ticker, "name": company.name, "exchange": company.exchange, "price": price, "change_percent": change, "volume": current.volume if current else None, "price_date": date_value})
+        history = [
+            {"price_date": row.price_date.isoformat(), "close": round(row.close, 2)}
+            for row in reversed(rows)
+            if row.close is not None
+        ]
+        instruments.append({"ticker": company.ticker, "name": company.name, "exchange": company.exchange, "price": price, "change_percent": change, "volume": current.volume if current else None, "price_date": date_value, "history": history})
         if change is not None and price is not None:
             movers.append({"ticker": company.ticker, "name": company.name, "change_percent": round(change, 2), "price": round(price, 2)})
 

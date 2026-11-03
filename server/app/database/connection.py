@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
 
 settings = get_settings()
-engine: Engine = create_engine(settings.database_url, pool_pre_ping=True)
+database_url = settings.database_url.strip()
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+if not database_url:
+    raise RuntimeError("DATABASE_URL is required")
+engine: Engine = create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
