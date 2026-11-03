@@ -21,3 +21,5 @@ finn-investment-agent/.vercel/
 .idea/
 .DS_Store
 Thumbs.db
+.neon
+node_modules/
