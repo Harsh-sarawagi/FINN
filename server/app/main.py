@@ -5,14 +5,12 @@ from contextlib import asynccontextmanager
 from app.api.router import api_router
 from app.config import get_settings
 from app.services.scheduler import start_scheduler
-from seed import seed
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    seed()
     start_scheduler()
     yield
     from app.services.scheduler import scheduler
