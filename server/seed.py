@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.database.connection import SessionLocal
-from app.models import Company
+from app.models import Company, PortfolioMember
 
 COMPANIES = [
     ("RELIANCE", "Reliance Industries Limited", "NSE"),
@@ -33,6 +33,12 @@ def seed() -> None:
             company = db.scalar(select(Company).where(Company.ticker == ticker, Company.exchange == exchange))
             if company is None:
                 db.add(Company(ticker=ticker, name=name, exchange=exchange))
+        db.commit()
+
+        for ticker in [item[0] for item in COMPANIES[:5]]:
+            company = db.scalar(select(Company).where(Company.ticker == ticker, Company.exchange == "NSE"))
+            if company and db.scalar(select(PortfolioMember).where(PortfolioMember.company_id == company.id)) is None:
+                db.add(PortfolioMember(company_id=company.id))
         db.commit()
 
 
